@@ -105,6 +105,7 @@ module Ruboty
 				end
 			end
 			def setinput(message)
+				#input_uri: 入力ファイル(空文字列ならクリア)
 				if !message[:input_uri]||message[:input_uri].empty?
 					@input=nil
 					message.reply 'Input cleared.'
@@ -114,6 +115,9 @@ module Ruboty
 				end
 			end
 			def submit(message)
+				#language: ID(数値)または言語名(文字列)。言語名の場合、記号類を除いて最大先頭一致のものを使用する。
+				#source_uri: ソースファイル
+				#input_uri: 入力ファイル(空文字列ならsetinputの内容を使用)
 				input=message[:input_uri]&&!message[:input_uri].empty? ? read_uri(message[:input_uri]) : @input
 				#guess lang
 				lang=message[:language]
@@ -140,6 +144,7 @@ module Ruboty
 				end
 			end
 			def view(message)
+				#id: ideone ID(空文字列なら直前のsubmitで返されたIDを使用)
 				submission=message[:id]&&!message[:id].empty? ? message[:id] : @current_submission
 				resp=@client.call(:get_submission_details,message:{
 					user:@user,pass:@pass,link:submission,with_output:true
