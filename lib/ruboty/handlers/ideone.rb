@@ -95,7 +95,7 @@ module Ruboty
 
 			on /ideone languages/, name: 'languages', description: 'show languages'
 			on /ideone setinput ?(?<input_uri>\S*)/, name: 'setinput', description: 'set input'
-			on /ideone submit (?<language>\w+) (?<source_uri>\S+) ?(?<input_uri>\S*)/, name: 'submit', description: 'send code via uri'
+			on /ideone submit (?<language>\S+) (?<source_uri>\S+) ?(?<input_uri>\S*)/, name: 'submit', description: 'send code via uri'
 			on /ideone view ?(?<id>\w*)/, name: 'view', description: 'view submission'
 			def languages(message)
 				resp=@client.call(:get_languages,message:{user:@user,pass:@pass})
@@ -124,9 +124,9 @@ module Ruboty
 				if lang.to_i>0
 					lang=lang.to_i
 				else
-					lang=lang.downcase.gsub(/\W/,'')
+					lang=lang.downcase.gsub(/[\s\(\)\.]/,'')
 					lang=@languages.max_by{|e|
-						_e=e[:value].downcase.gsub(/\W/,'')
+						_e=e[:value].downcase.gsub(/[\s\(\)\.]/,'')
 						lang.size.downto(1).find{|i|_e.start_with?(lang[0,i])}||-1
 					}[:key].to_i
 				end
