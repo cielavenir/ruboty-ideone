@@ -75,7 +75,7 @@ LANGUAGES=[
 module Ruboty
 	module Handlers
 		class Ideone < Base
-			def initialize
+			def initialize(*__reserved__)
 				super
 				@client==Savon.client(log:false,wsdl:'http://ideone.com/api/1/service.wsdl')
 				@user=ENV['IDEONE_USER']
