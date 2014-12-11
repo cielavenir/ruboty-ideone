@@ -1,8 +1,13 @@
 #coding:utf-8
+require 'open-uri'
 require 'rubygems'
 require 'savon'
 
-LANGUAGES=[
+#クラス変数を使いたいので、Actionを切り出すことは不可能
+module Ruboty
+	module Handlers
+		class Ideone < Base
+			LANGUAGES=[
 	{:key=>"7", :value=>"Ada (gnat-4.6)"},
 	{:key=>"13", :value=>"Assembler (nasm-2.10.01)"},
 	{:key=>"45", :value=>"Assembler (gcc-4.8.1)"},
@@ -69,33 +74,47 @@ LANGUAGES=[
 	{:key=>"115", :value=>"Unlambda (unlambda-2.0.0)"},
 	{:key=>"101", :value=>"VB.NET (mono-2.4.2.3)"},
 	{:key=>"6", :value=>"Whitespace (wspace 0.3)"}
-]
+			]
 
-#クラス変数を使いたいので、Actionを切り出すことは不可能
-module Ruboty
-	module Handlers
-		class Ideone < Base
 			def initialize(*__reserved__)
 				super
-				@client==Savon.client(log:false,wsdl:'http://ideone.com/api/1/service.wsdl')
+				@client=Savon.client(log:false,wsdl:'http://ideone.com/api/1/service.wsdl')
 				@user=ENV['IDEONE_USER']
 				@pass=ENV['IDEONE_PASS']
+				@input=nil
 				@current_submission=nil
 
 				@languages=LANGUAGES
 			end
+			def read_uri(uri)
+				return nil if !uri||uri.empty?
+				Kernel.open(uri){|f|
+					return f.read
+				}
+			end
 
 			on /ideone languages/, name: 'languages', description: 'show languages'
-			on /ideone submit (?<language>\w+) (?<uri>\w+)/, name: 'submit', description: 'send code via url'
+			on /ideone setinput ?(?<input_uri>\S*)/, name: 'setinput', description: 'set input'
+			on /ideone submit (?<language>\w+) (?<source_uri>\S+) ?(?<input_uri>\S*)/, name: 'submit', description: 'send code via uri'
 			on /ideone view ?(?<id>\w*)/, name: 'view', description: 'view submission'
 			def languages(message)
 				resp=@client.call(:get_languages,message:{user:@user,pass:@pass})
 				item=resp.body[:get_languages_response][:return][:item][1][:value]
 				if item&&item[:item]
-					message.reply item[:item].map{|e|"#{e[:key]}: #{e[:value]}\n"}.join
+					message.reply item[:item].map{|e|"#{'%4d:'%e[:key]} #{e[:value]}\n"}.join
+				end
+			end
+			def setinput(message)
+				if !message[:input_uri]||message[:input_uri].empty?
+					@input=nil
+					message.reply 'Input cleared.'
+				else
+					@input=read_uri(message[:input_uri])
+					message.reply 'Input set.'
 				end
 			end
 			def submit(message)
+				input=message[:input_uri]&&!message[:input_uri].empty? ? read_uri(message[:input_uri]) : @input
 				#guess lang
 				lang=message[:language]
 				if lang.to_i>0
@@ -103,23 +122,50 @@ module Ruboty
 				else
 					lang=lang.downcase.gsub(/\W/,'')
 					lang=@languages.max_by{|e|
-						_e=e.downcase.gsub(/\W/,'')
-						(lang.size-1).downto(0).find{|i|_e.begin_with?(lang[0,i])}
+						_e=e[:value].downcase.gsub(/\W/,'')
+						lang.size.downto(1).find{|i|_e.start_with?(lang[0,i])}||-1
 					}[:key].to_i
 				end
-				resp=@client.call(:create_submission,message:{user:@user,pass:@pass,source_code:source_str,input:input,run:true,private:true,language:lang})
+				resp=@client.call(:create_submission,message:{
+					user:@user,pass:@pass,source_code:read_uri(message[:source_uri]),input:input,run:true,private:true,language:lang
+				})
 				result=Hash[*resp.body[:create_submission_response][:return][:item].flat_map{|e|[e[:key],e[:value]]}]
-				if result['error']!='OK'
-					message.reply 'something wrong happened in submission'
+				if result['error']=='AUTH_ERROR'
+					message.reply '[Ruboty::Ideone] wrong authentication'
+				elsif result['error']!='OK'
+					message.reply '[Ruboty::Ideone] something wrong happened in submission'
 				else
 					@current_submission=result['link']
 					message.reply 'http://ideone.com/'+result['link']
 				end
 			end
 			def view(message)
-				resp=client.call(:get_submission_details,message:{user:USER,pass:PASS,link:message[:id]||@current_submission,with_output:true})
+				submission=message[:id]&&!message[:id].empty? ? message[:id] : @current_submission
+				resp=@client.call(:get_submission_details,message:{
+					user:@user,pass:@pass,link:submission,with_output:true
+				})
 				result=Hash[*resp.body[:get_submission_details_response][:return][:item].flat_map{|e|[e[:key],e[:value]]}]
-				message.reply result.inspect
+				if result['status'].to_i<0
+					message.reply '[Ruboty::Ideone] waiting for compilation'
+				elsif result['status'].to_i==1
+					message.reply '[Ruboty::Ideone] compiling'
+				elsif result['status'].to_i==3
+					message.reply '[Ruboty::Ideone] running'
+				elsif result['error']!='OK'
+					message.reply '[Ruboty::Ideone] something wrong happened in execution'
+				elsif result['result']=='15'
+					message.reply result['output']
+				else
+					message.reply('[Ruboty::Ideone] '+[
+						0=>'not running',
+						11=>'compilation error',
+						12=>'runtime error',
+						13=>'time limit exceeded',
+						17=>'memory limit exceeded',
+						19=>'illegal system call',
+						20=>'internal error',
+					][result['result'].to_i])
+				end
 			end
 		end
 	end
