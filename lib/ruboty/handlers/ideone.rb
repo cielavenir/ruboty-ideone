@@ -173,7 +173,7 @@ module Ruboty
 				elsif result['result']=='15'
 					message.reply result['output']
 				else
-					message.reply('[Ruboty::Ideone] '+[
+					message.reply('[Ruboty::Ideone] '+{
 						0=>'not running',
 						11=>'compilation error',
 						12=>'runtime error',
@@ -181,7 +181,7 @@ module Ruboty
 						17=>'memory limit exceeded',
 						19=>'illegal system call',
 						20=>'internal error',
-					][result['result'].to_i])
+					}[result['result'].to_i])
 				end
 			end
 		end
