@@ -112,6 +112,7 @@ module Ruboty
 				resp=@client.call(:get_languages,message:{user:@user,pass:@pass})
 				item=resp.body[:get_languages_response][:return][:item][1][:value]
 				if item&&item[:item]
+					@languages=item[:item]
 					message.reply item[:item].map{|e|"#{'%4d:'%e[:key]} #{e[:value]}\n"}.join
 				end
 			end
