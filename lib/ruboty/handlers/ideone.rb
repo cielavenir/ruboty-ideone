@@ -108,6 +108,9 @@ module Ruboty
 			on /ideone setinput ?(?<input_uri>\S*)/, name: 'setinput', description: 'set input'
 			on /ideone submit (?<language>\S+) (?<source_uri>\S+) ?(?<input_uri>\S*)/, name: 'submit', description: 'send code via uri'
 			on /ideone view ?(?<id>\w*)/, name: 'view', description: 'view submission'
+			env :IDEONE_USER, 'ideone API username'
+			env :IDEONE_PASS, 'ideone API password'
+
 			def languages(message)
 				resp=@client.call(:get_languages,message:{user:@user,pass:@pass})
 				item=resp.body[:get_languages_response][:return][:item][1][:value]
